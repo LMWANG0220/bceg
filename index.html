@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<title>施工工艺样板</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body {
+    height:100%; background:#14181c; color:#fff;
+    font-family:-apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+    overscroll-behavior:none;
+  }
+  body { display:flex; flex-direction:column; }
+
+  header {
+    flex:0 0 auto; text-align:center;
+    padding:calc(env(safe-area-inset-top) + 18px) 16px 12px;
+  }
+  header .n { font-size:22px; font-weight:600; }
+  header .s { font-size:13px; color:#9aa5b1; margin-top:6px; }
+
+  .carousel { flex:1 1 auto; position:relative; overflow:hidden; }
+  .track {
+    display:flex; height:100%; overflow-x:auto; overflow-y:hidden;
+    scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; scrollbar-width:none;
+  }
+  .track::-webkit-scrollbar { display:none; }
+  .slide {
+    flex:0 0 100%; height:100%; scroll-snap-align:center;
+    display:flex; align-items:center; justify-content:center; padding:0 10px;
+  }
+  .slide img {
+    max-width:100%; max-height:100%; object-fit:contain; border-radius:8px; display:block;
+  }
+
+  .qr-card {
+    width:min(82vw, 350px); background:#fff; border-radius:16px;
+    padding:22px 20px 18px; text-align:center; color:#1b1f23;
+    box-shadow:0 8px 30px rgba(0,0,0,.45);
+  }
+  .qr-card img { width:100%; display:block; border-radius:8px; }
+  .qr-card p { font-size:13px; color:#6b7480; margin-top:12px; }
+
+  .bar {
+    flex:0 0 auto; display:flex; align-items:center; justify-content:center; gap:7px;
+    padding:14px 0 calc(env(safe-area-inset-bottom) + 20px);
+  }
+  .dot { width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,.3); transition:.25s; }
+  .dot.on { width:18px; border-radius:4px; background:#fff; }
+  .dot.qr { border-radius:2px; }
+  .dot.qr.on { background:#4da3ff; }
+  .count {
+    position:absolute; left:50%; transform:translateX(-50%);
+    bottom:calc(env(safe-area-inset-bottom) + 46px);
+    font-size:12px; color:rgba(255,255,255,.75);
+    background:rgba(0,0,0,.4); padding:3px 11px; border-radius:20px;
+  }
+
+  .viewer {
+    position:fixed; inset:0; background:rgba(0,0,0,.94); z-index:99;
+    display:none; align-items:center; justify-content:center; flex-direction:column;
+  }
+  .viewer.on { display:flex; }
+  .viewer img { max-width:100%; max-height:88%; object-fit:contain; }
+  .viewer .close {
+    position:absolute; top:calc(env(safe-area-inset-top) + 14px); right:16px;
+    width:36px; height:36px; line-height:34px; text-align:center;
+    border-radius:50%; background:rgba(255,255,255,.16); font-size:20px;
+  }
+  .viewer .hint { color:#8b939c; font-size:13px; margin-top:14px; }
+
+  .page {
+    flex:1 1 auto; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; padding:20px 26px; text-align:center;
+  }
+  .page .ico { font-size:54px; margin-bottom:18px; }
+  .page .h { font-size:19px; font-weight:600; }
+  .page .p { font-size:14px; color:#8b939c; margin-top:10px; line-height:1.8; }
+</style>
+</head>
+<body>
+
+<header id="hd"></header>
+<div class="carousel" id="car" style="display:none">
+  <div class="track" id="track"></div>
+  <div class="count" id="count"></div>
+</div>
+<div class="bar" id="bar"></div>
+<div class="page" id="page" style="display:none"></div>
+
+<div class="viewer" id="viewer">
+  <span class="close">✕</span>
+  <img id="vimg" src="" alt="">
+  <div class="hint">点击任意处关闭</div>
+</div>
+
+<script src="config.js"></script>
+<script>
+(function () {
+  var V   = window.VERSION || '1';
+  var ALL = window.ITEMS || [];
+  var T   = window.SITE_TITLE || '';
+
+  var ps = new URLSearchParams(location.search);
+  var key = ps.get('p') || ps.get('n') || '';
+  var cur = null;
+  for (var i = 0; i < ALL.length; i++) {
+    if (ALL[i].id === key) { cur = ALL[i]; break; }
+  }
+
+  // 拼版本号，换照片后改 config.js 的 VERSION 就能刷新微信缓存
+  function v(src) { return src + (src.indexOf('?') >= 0 ? '&' : '?') + 'v=' + V; }
+
+  var hd   = document.getElementById('hd');
+  var car  = document.getElementById('car');
+  var page = document.getElementById('page');
+
+  if (!cur) {
+    document.title = T || '施工工艺样板';
+    hd.innerHTML = '<div class="n">' + (T || '施工工艺样板') + '</div>';
+    page.style.display = 'flex';
+    page.innerHTML = '<div class="ico">📷</div>'
+      + '<div class="h">请扫描现场二维码</div>'
+      + '<div class="p">每个工艺样板对应一张专属二维码</div>';
+    return;
+  }
+
+  /* ---- 扫到具体工艺：显示照片 ---- */
+  document.title = cur.name;
+  hd.innerHTML = '<div class="n">' + cur.name + '</div>'
+               + (T ? '<div class="s">' + T + '</div>' : '');
+
+  car.style.display = '';
+  var track = document.getElementById('track');
+  var bar   = document.getElementById('bar');
+  var count = document.getElementById('count');
+  var index = 0;
+
+  var urls = cur.images.map(v);
+  var hasQr = !!cur.qr;                       // 配了 qr 才多一屏二维码
+  var total = urls.length + (hasQr ? 1 : 0);
+
+  cur.images.forEach(function (src, i) {
+    var s = document.createElement('div'); s.className = 'slide';
+    var im = document.createElement('img');
+    im.src = urls[i]; im.alt = cur.name + ' ' + (i + 1);
+    im.draggable = false;
+    im.onclick = function () { openViewer(urls[i]); };
+    s.appendChild(im); track.appendChild(s);
+    bar.appendChild(document.createElement('span')).className = 'dot';
+  });
+
+  if (hasQr) {
+    var qs = document.createElement('div'); qs.className = 'slide';
+    var card = document.createElement('div'); card.className = 'qr-card';
+    card.innerHTML = '<img src="' + v(cur.qr) + '" alt="二维码">'
+                   + '<p>长按识别二维码</p>';
+    qs.appendChild(card); track.appendChild(qs);
+    bar.appendChild(document.createElement('span')).className = 'dot qr';
+  }
+
+  var dots = bar.querySelectorAll('.dot');
+  function setActive(i) {
+    index = i;
+    for (var k = 0; k < dots.length; k++) dots[k].classList.toggle('on', k === i);
+    count.textContent = (i + 1) + ' / ' + total;
+    preload(i + 1); preload(i - 1);
+  }
+  function preload(i) { if (i >= 0 && i < urls.length) { var im = new Image(); im.src = urls[i]; } }
+  setActive(0);
+
+  var tick;
+  track.addEventListener('scroll', function () {
+    clearTimeout(tick);
+    tick = setTimeout(function () {
+      var w = track.clientWidth;
+      if (w) setActive(Math.round(track.scrollLeft / w));
+    }, 60);
+  });
+
+  var viewer = document.getElementById('viewer');
+  function openViewer(src) {
+    document.getElementById('vimg').src = src;
+    viewer.classList.add('on');
+  }
+  viewer.onclick = function () { viewer.classList.remove('on'); };
+})();
+</script>
+</body>
+</html>
